@@ -4,14 +4,25 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+// --- NEW ADDITION: Add CORS Policy ---
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        b =>
+        {
+            b.AllowAnyOrigin()  // Allows the frontend to connect from localhost:3000, 4200, etc.
+             .AllowAnyMethod()  // Fixes the 405 error (allows OPTIONS, GET, POST, PUT, DELETE)
+             .AllowAnyHeader(); // Allows custom headers (like Authorization tokens)
+        });
+});
+
 builder.Services.AddControllers();
 
-// --- FIX 1: Remove conflicting OpenApi lines ---
-// You were mixing the new Microsoft OpenAPI and Swashbuckle. 
-// Stick to Swashbuckle (AddSwaggerGen) for now as it works best with SwaggerUI.
+// --- PREVIOUS FIX: Remove conflicting OpenApi lines ---
 // builder.Services.AddOpenApi(); <--- REMOVE THIS
 
-builder.Services.AddEndpointsApiExplorer(); // Add this line (required for minimal APIs/Swagger)
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -21,15 +32,16 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
-// --- FIX 2: Ensure Swagger runs in Production ---
+// --- NEW ADDITION: Enable CORS Middleware ---
+// IMPORTANT: This must be placed BEFORE UseAuthorization
+app.UseCors("AllowAll");
+
 // app.MapOpenApi(); <--- REMOVE THIS (Conflict)
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    // --- FIX 3: REMOVE THE LEADING SLASH ---
-    // Change "/swagger/v1/swagger.json" to "swagger/v1/swagger.json"
-    // This fixes the 404 error if your app is hosted in a sub-folder.
+    // --- PREVIOUS FIX: Relative path for Swagger JSON ---
     c.SwaggerEndpoint("swagger/v1/swagger.json", "My API V1");
 
     // Keep this to make Swagger the homepage
@@ -37,7 +49,9 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseHttpsRedirection();
+
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
